@@ -5,6 +5,10 @@
 ## Overview
 This is a 3D space shooter game built in **Unity** with AI-controlled bots using **Reinforcement Learning (RL)**. The game features **endless waves of AI enemies** that track and attack the player. The AI bots use a custom reinforcement learning framework with **Deep Q-Learning (DQN)** for discrete actions and **Proximal Policy Optimization (PPO)** for continuous actions.
 
+The game has two difficulty modes:
+1. **DQN Mode:** AI bots use Deep Q-Learning for decision-making.
+2. **PPO Mode:** AI bots use Proximal Policy Optimization for more advanced control.
+
 ## Features
 - **Player vs. AI Combat:** The player must survive against intelligent AI-controlled spaceships.
 - **Reinforcement Learning Bots:** AI enemies detect the player's position, move toward them, and fire bullets.
