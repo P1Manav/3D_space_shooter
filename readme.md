@@ -2,6 +2,8 @@
 
 **(Still in development)**
 
+## Demo
+- **[LINK](https://drive.google.com/file/d/1whLc1UUauiVTQG8RQjD-ApG4_6w7B1Hw/view)**
 ## Overview
 This is a 3D space shooter game built in **Unity** with AI-controlled bots using **Reinforcement Learning (RL)**. The game features **endless waves of AI enemies** that track and attack the player. The AI bots use a custom reinforcement learning framework with **Deep Q-Learning (DQN)** for discrete actions and **Proximal Policy Optimization (PPO)** for continuous actions.
 
