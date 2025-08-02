@@ -1,50 +1,108 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Camera Settings")]
-    public float NormalSpeed = 20f;
-    public float BoostSpeed = 40f;
-    public float SprintSpeed = 60f;
-    public float LookSpeed = 2f;
+    [Header("Movement Settings")]
+    public float baseSpeed = 10f;
+    public float speedAdjustStep = 2f;
+    public float boostMultiplier = 2f;
+    public float strafeSpeed = 5f;
+
+    [Header("Mouse Look Settings")]
+    public float mouseSensitivity = 2f;
+
+    [Header("Shooting Settings")]
+    public GameObject bulletPrefab;
+    public Transform firePoint;
+
+    private float currentSpeed;
+    private Rigidbody rb;
 
     private float yaw = 0f;
     private float pitch = 0f;
-    private float currentSpeed;
 
     void Start()
     {
-        currentSpeed = NormalSpeed;
+        rb = GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            Debug.LogError("Rigidbody component missing from PlayerController.");
+        }
+
+        Cursor.lockState = CursorLockMode.Locked;
+        currentSpeed = baseSpeed;
     }
 
     void Update()
     {
-        yaw += Input.GetAxis("Mouse X") * LookSpeed;
-        pitch -= Input.GetAxis("Mouse Y") * LookSpeed;
+        HandleMouseLook();
+        HandleSpeedAdjustment();
+        HandleShooting();
+    }
+
+    void FixedUpdate()
+    {
+        HandleMovement();
+    }
+
+    void HandleMouseLook()
+    {
+        yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
+        pitch -= Input.GetAxis("Mouse Y") * mouseSensitivity;
+        pitch = Mathf.Clamp(pitch, -89f, 89f); // Prevent flipping
+
         transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+    }
 
-        currentSpeed = NormalSpeed;
-
-        if (Input.GetKey(KeyCode.W))
+    void HandleSpeedAdjustment()
+    {
+        if (Input.GetKeyDown(KeyCode.W))
         {
-            currentSpeed = BoostSpeed;
-            if (Input.GetKey(KeyCode.LeftShift))
-            {
-                currentSpeed = SprintSpeed;
-            }
+            currentSpeed += speedAdjustStep;
         }
 
-        Vector3 moveDirection = transform.forward;
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            currentSpeed = 0f;
+            rb.linearVelocity = Vector3.zero;  // <--- Force stop when S is pressed
+        }
+    }
 
-        if (Input.GetKey(KeyCode.S)) moveDirection -= transform.forward;
-        if (Input.GetKey(KeyCode.A)) moveDirection -= transform.right;
-        if (Input.GetKey(KeyCode.D)) moveDirection += transform.right;
-        if (Input.GetKey(KeyCode.E)) moveDirection += transform.up;
-        if (Input.GetKey(KeyCode.Q)) moveDirection -= transform.up;
+    void HandleMovement()
+    {
+        float strafe = 0f;
+        if (Input.GetKey(KeyCode.A)) strafe = -strafeSpeed;
+        if (Input.GetKey(KeyCode.D)) strafe = strafeSpeed;
 
-        moveDirection.Normalize();
-        transform.position += moveDirection * (currentSpeed * Time.deltaTime);
+        float speed = currentSpeed;
+        if (Input.GetKey(KeyCode.LeftShift)) speed *= boostMultiplier;
+
+        Vector3 forwardMovement = transform.forward * speed;
+        Vector3 strafeMovement = transform.right * strafe;
+
+        Vector3 finalVelocity = forwardMovement + strafeMovement;
+
+        rb.linearVelocity = finalVelocity;
+    }
+
+    void HandleShooting()
+    {
+        if (Input.GetMouseButtonDown(0)) // Left click
+        {
+            Fire();
+        }
+    }
+
+    void Fire()
+    {
+        if (bulletPrefab != null && firePoint != null)
+        {
+            Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
+        }
+    }
+
+    void OnApplicationQuit()
+    {
+        Cursor.lockState = CursorLockMode.None;
     }
 }
