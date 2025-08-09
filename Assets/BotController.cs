@@ -1,78 +1,76 @@
 using UnityEngine;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System;
-using Newtonsoft.Json.Linq;
 
 public class BotController : MonoBehaviour
 {
-    public Rigidbody botRb;
-    public float moveSpeed = 10f;
-    public float rotationLerpSpeed = 3f;
+    public Transform firePoint;
+    public GameObject bulletPrefab; // must be a prefab from Project window
+    public string agentId = "bot_1";
+    public string ownerTag = "Bot";
+    public float moveSpeed = 12f;
+    public float rotationMultiplier = 1f;
+    public float fov = 25f;
+    public float bulletSpeed = 50f;
 
-    private TcpClient client;
-    private NetworkStream stream;
-    private Thread receiveThread;
-    private bool running = true;
+    private float yawDelta, pitchDelta, rollDelta;
+    private bool shootRequested;
+    private Collider myCollider;
 
-    private Quaternion targetRotation = Quaternion.identity;
-
-    void Start()
+    void Awake()
     {
-        receiveThread = new Thread(ReceiveDataLoop);
-        receiveThread.IsBackground = true;
-        receiveThread.Start();
+        myCollider = GetComponent<Collider>();
     }
 
-    void FixedUpdate()
+    public void SetPrediction(float yaw, float pitch, float roll, bool shoot)
     {
-        botRb.MoveRotation(Quaternion.Lerp(botRb.rotation, targetRotation, Time.fixedDeltaTime * rotationLerpSpeed));
-        botRb.MovePosition(botRb.position + botRb.transform.forward * moveSpeed * Time.fixedDeltaTime);
+        yawDelta = yaw;
+        pitchDelta = pitch;
+        rollDelta = roll;
+        shootRequested = shoot;
     }
 
-    void ReceiveDataLoop()
+    void Update()
     {
-        try
+        transform.Translate(Vector3.forward * moveSpeed * Time.deltaTime);
+        Vector3 rotChange = new Vector3(pitchDelta, yawDelta, rollDelta) * rotationMultiplier * Time.deltaTime * 60f;
+        transform.Rotate(rotChange, Space.Self);
+
+        if (shootRequested)
         {
-            client = new TcpClient("127.0.0.1", 5006);
-            stream = client.GetStream();
-
-            byte[] buffer = new byte[2048];
-
-            while (running)
+            GameObject player = GameObject.FindWithTag("Player");
+            if (player != null)
             {
-                int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                if (bytesRead == 0) continue;
-
-                string json = Encoding.ASCII.GetString(buffer, 0, bytesRead).Trim();
-                JObject parsed = JObject.Parse(json);
-
-                Quaternion predictedRotation = new Quaternion(
-                    (float)parsed["rotation"]["x"],
-                    (float)parsed["rotation"]["y"],
-                    (float)parsed["rotation"]["z"],
-                    (float)parsed["rotation"]["w"]
-                );
-
-                UnityMainThreadDispatcher.Instance().Enqueue(() =>
+                Vector3 toPlayer = (player.transform.position - transform.position).normalized;
+                float angle = Vector3.Angle(transform.forward, toPlayer);
+                if (angle <= fov)
                 {
-                    targetRotation = predictedRotation;
-                    Debug.Log("[BOT] Received target rotation: " + targetRotation);
-                });
+                    MainThreadDispatcher.Enqueue(() => Fire());
+                }
             }
-        }
-        catch (Exception e)
-        {
-            Debug.LogError("[BotController] Error: " + e.Message);
+            shootRequested = false;
         }
     }
 
-    void OnApplicationQuit()
+    void Fire()
     {
-        running = false;
-        stream?.Close();
-        client?.Close();
-        if (receiveThread != null && receiveThread.IsAlive) receiveThread.Abort();
+        if (!bulletPrefab || !firePoint) return;
+
+        // Create a new clone so the original prefab is never touched
+        GameObject bulletClone = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
+
+        Bullet bulletScript = bulletClone.GetComponent<Bullet>();
+        if (bulletScript != null)
+        {
+            bulletScript.ownerTag = ownerTag;
+            bulletScript.shooterId = agentId;
+        }
+
+        Rigidbody rbBullet = bulletClone.GetComponent<Rigidbody>();
+        if (rbBullet != null) rbBullet.linearVelocity = firePoint.forward * bulletSpeed;
+
+        Collider bulletCol = bulletClone.GetComponent<Collider>();
+        if (bulletCol && myCollider) Physics.IgnoreCollision(bulletCol, myCollider);
+
+        // Destroy the clone after 8 seconds (prefab stays intact)
+        Destroy(bulletClone, 8f);
     }
 }

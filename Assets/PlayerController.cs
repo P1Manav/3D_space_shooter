@@ -2,33 +2,24 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Movement Settings")]
     public float baseSpeed = 10f;
     public float speedAdjustStep = 2f;
     public float boostMultiplier = 2f;
     public float strafeSpeed = 5f;
-
-    [Header("Mouse Look Settings")]
     public float mouseSensitivity = 2f;
 
-    [Header("Shooting Settings")]
-    public GameObject bulletPrefab;
+    public GameObject bulletPrefab; // must be a prefab from Project window
     public Transform firePoint;
+    public float bulletSpeed = 50f;
 
     private float currentSpeed;
     private Rigidbody rb;
-
-    private float yaw = 0f;
-    private float pitch = 0f;
+    private float yaw;
+    private float pitch;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        if (rb == null)
-        {
-            Debug.LogError("Rigidbody component missing from PlayerController.");
-        }
-
         Cursor.lockState = CursorLockMode.Locked;
         currentSpeed = baseSpeed;
     }
@@ -49,22 +40,17 @@ public class PlayerController : MonoBehaviour
     {
         yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
         pitch -= Input.GetAxis("Mouse Y") * mouseSensitivity;
-        pitch = Mathf.Clamp(pitch, -89f, 89f); // Prevent flipping
-
+        pitch = Mathf.Clamp(pitch, -89f, 89f);
         transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
     }
 
     void HandleSpeedAdjustment()
     {
-        if (Input.GetKeyDown(KeyCode.W))
-        {
-            currentSpeed += speedAdjustStep;
-        }
-
+        if (Input.GetKeyDown(KeyCode.W)) currentSpeed += speedAdjustStep;
         if (Input.GetKeyDown(KeyCode.S))
         {
             currentSpeed = 0f;
-            rb.linearVelocity = Vector3.zero;  // <--- Force stop when S is pressed
+            rb.linearVelocity = Vector3.zero;
         }
     }
 
@@ -73,36 +59,44 @@ public class PlayerController : MonoBehaviour
         float strafe = 0f;
         if (Input.GetKey(KeyCode.A)) strafe = -strafeSpeed;
         if (Input.GetKey(KeyCode.D)) strafe = strafeSpeed;
-
         float speed = currentSpeed;
         if (Input.GetKey(KeyCode.LeftShift)) speed *= boostMultiplier;
 
         Vector3 forwardMovement = transform.forward * speed;
         Vector3 strafeMovement = transform.right * strafe;
-
-        Vector3 finalVelocity = forwardMovement + strafeMovement;
-
-        rb.linearVelocity = finalVelocity;
+        rb.linearVelocity = forwardMovement + strafeMovement;
     }
 
     void HandleShooting()
     {
-        if (Input.GetMouseButtonDown(0)) // Left click
+        if (Input.GetMouseButton(0))
         {
             Fire();
         }
     }
 
-    void Fire()
+    public void Fire()
     {
-        if (bulletPrefab != null && firePoint != null)
-        {
-            Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
-        }
-    }
+        if (!bulletPrefab || !firePoint) return;
 
-    void OnApplicationQuit()
-    {
-        Cursor.lockState = CursorLockMode.None;
+        // Clone the prefab
+        GameObject bulletClone = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
+
+        Bullet b = bulletClone.GetComponent<Bullet>();
+        if (b != null)
+        {
+            b.ownerTag = gameObject.tag;
+            b.shooterId = "player_1";
+        }
+
+        Rigidbody rbBullet = bulletClone.GetComponent<Rigidbody>();
+        if (rbBullet != null) rbBullet.linearVelocity = firePoint.forward * bulletSpeed;
+
+        Collider bulletCol = bulletClone.GetComponent<Collider>();
+        Collider playerCol = GetComponent<Collider>();
+        if (bulletCol && playerCol) Physics.IgnoreCollision(bulletCol, playerCol);
+
+        // Destroy only the clone
+        Destroy(bulletClone, 8f);
     }
 }

@@ -31,11 +31,11 @@ public class CinematicCameraController : MonoBehaviour
 
     void HandleRotation()
     {
-        if (Input.GetMouseButton(1)) // Right mouse button to rotate
+        if (Input.GetMouseButton(1))
         {
             yaw += Input.GetAxis("Mouse X") * lookSpeed;
             pitch -= Input.GetAxis("Mouse Y") * lookSpeed;
-            pitch = Mathf.Clamp(pitch, -80f, 80f); // avoid flipping
+            pitch = Mathf.Clamp(pitch, -80f, 80f); 
 
             transform.eulerAngles = new Vector3(pitch, yaw, 0f);
         }
