@@ -1,3 +1,4 @@
+// PlayerController.cs
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
@@ -8,7 +9,7 @@ public class PlayerController : MonoBehaviour
     public float strafeSpeed = 5f;
     public float mouseSensitivity = 2f;
 
-    public GameObject bulletPrefab; // must be a prefab from Project window
+    public GameObject bulletPrefab; // prefab from Project window
     public Transform firePoint;
     public float bulletSpeed = 50f;
 
@@ -50,7 +51,7 @@ public class PlayerController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.S))
         {
             currentSpeed = 0f;
-            rb.linearVelocity = Vector3.zero;
+            if (rb != null) rb.linearVelocity = Vector3.zero;
         }
     }
 
@@ -64,7 +65,7 @@ public class PlayerController : MonoBehaviour
 
         Vector3 forwardMovement = transform.forward * speed;
         Vector3 strafeMovement = transform.right * strafe;
-        rb.linearVelocity = forwardMovement + strafeMovement;
+        if (rb != null) rb.linearVelocity = forwardMovement + strafeMovement;
     }
 
     void HandleShooting()
@@ -77,26 +78,25 @@ public class PlayerController : MonoBehaviour
 
     public void Fire()
     {
-        if (!bulletPrefab || !firePoint) return;
+        if (bulletPrefab == null || firePoint == null) return;
 
-        // Clone the prefab
-        GameObject bulletClone = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
-
-        Bullet b = bulletClone.GetComponent<Bullet>();
+        GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
+        Bullet b = bullet.GetComponent<Bullet>();
         if (b != null)
         {
             b.ownerTag = gameObject.tag;
             b.shooterId = "player_1";
+            b.serverIP = "127.0.0.1";
+            b.serverPort = 5000;
         }
 
-        Rigidbody rbBullet = bulletClone.GetComponent<Rigidbody>();
+        Rigidbody rbBullet = bullet.GetComponent<Rigidbody>();
         if (rbBullet != null) rbBullet.linearVelocity = firePoint.forward * bulletSpeed;
 
-        Collider bulletCol = bulletClone.GetComponent<Collider>();
+        Collider bulletCol = bullet.GetComponent<Collider>();
         Collider playerCol = GetComponent<Collider>();
-        if (bulletCol && playerCol) Physics.IgnoreCollision(bulletCol, playerCol);
+        if (bulletCol != null && playerCol != null) Physics.IgnoreCollision(bulletCol, playerCol);
 
-        // Destroy only the clone
-        Destroy(bulletClone, 8f);
+        Destroy(bullet, 8f);
     }
 }

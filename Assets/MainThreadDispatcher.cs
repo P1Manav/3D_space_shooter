@@ -1,3 +1,4 @@
+// MainThreadDispatcher.cs
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -35,7 +36,8 @@ public class MainThreadDispatcher : MonoBehaviour
         {
             while (_executionQueue.Count > 0)
             {
-                _executionQueue.Dequeue().Invoke();
+                try { _executionQueue.Dequeue().Invoke(); }
+                catch (Exception e) { Debug.LogException(e); }
             }
         }
     }

@@ -993,6 +993,8 @@ MonoBehaviour:
   rotationMultiplier: 1
   fov: 25
   bulletSpeed: 50
+  fireRate: 0.2
+  shootDistance: 120
 --- !u!65 &930785859
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1177,7 +1179,7 @@ Transform:
   m_GameObject: {fileID: 1941067345}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 150, z: -59}
+  m_LocalPosition: {x: 0, y: 140, z: -60}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1208,7 +1210,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: f6d301978179f5048a349384c3f6bb0b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -40
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: f6d301978179f5048a349384c3f6bb0b, type: 3}
       propertyPath: m_LocalPosition.y

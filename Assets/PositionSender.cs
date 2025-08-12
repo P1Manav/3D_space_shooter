@@ -1,4 +1,3 @@
-// PositionSender.cs
 using UnityEngine;
 using System;
 using System.Net.Sockets;
@@ -10,11 +9,11 @@ public class PositionSender : MonoBehaviour
 {
     public Transform player;
     public Transform botTransform;
-    public BotController botController; // assign in inspector
+    public BotController botController;
     public string agentId = "bot_1";
     public string serverIP = "127.0.0.1";
     public int serverPort = 5000;
-    public float sendInterval = 0.05f; // seconds
+    public float sendInterval = 0.05f; // ~20 FPS update
 
     private Thread netThread;
     private volatile bool running = false;
@@ -25,13 +24,22 @@ public class PositionSender : MonoBehaviour
     private string pendingStateJson = null;
     private Queue<string> incomingResponses = new Queue<string>();
     private string recvBuffer = "";
-    private float lastSendTime = 0f;
+
+    private static bool alreadyExists = false; // singleton protection
 
     void Start()
     {
+        if (alreadyExists)
+        {
+            Debug.LogError("[PositionSender] Duplicate instance detected. Destroying...");
+            Destroy(gameObject);
+            return;
+        }
+        alreadyExists = true;
+
         if (player == null || botTransform == null || botController == null)
         {
-            Debug.LogError("[PositionSender] Assign player, botTransform, botController in inspector!");
+            Debug.LogError("[PositionSender] Assign player, botTransform and botController in Inspector!");
             enabled = false;
             return;
         }
@@ -43,27 +51,26 @@ public class PositionSender : MonoBehaviour
 
     void Update()
     {
-        if (Time.time - lastSendTime >= sendInterval)
+        // build state
+        StateData sd = new StateData()
         {
-            lastSendTime = Time.time;
+            agent_id = agentId,
+            player_pos = new float[] { player.position.x, player.position.y, player.position.z },
+            player_vel = GetVel(player),
+            player_rot = new float[] { player.eulerAngles.x, player.eulerAngles.y, player.eulerAngles.z },
 
-            var sd = new StateData()
-            {
-                agent_id = agentId,
-                player_pos = new float[] { player.position.x, player.position.y, player.position.z },
-                player_vel = TryGetVelocity(player),
-                player_rot = new float[] { player.eulerAngles.x, player.eulerAngles.y, player.eulerAngles.z },
+            bot_pos = new float[] { botTransform.position.x, botTransform.position.y, botTransform.position.z },
+            bot_vel = GetVel(botTransform),
+            bot_rot = new float[] { botTransform.eulerAngles.x, botTransform.eulerAngles.y, botTransform.eulerAngles.z }
+        };
 
-                bot_pos = new float[] { botTransform.position.x, botTransform.position.y, botTransform.position.z },
-                bot_vel = TryGetVelocity(botTransform),
-                bot_rot = new float[] { botTransform.eulerAngles.x, botTransform.eulerAngles.y, botTransform.eulerAngles.z }
-            };
-
-            string json = JsonUtility.ToJson(sd) + "\n";
-            lock (lockObj) { pendingStateJson = json; }
+        string json = JsonUtility.ToJson(sd) + "\n";
+        lock (lockObj)
+        {
+            pendingStateJson = json;
         }
 
-        // Process responses on main thread (safe to call Unity APIs here)
+        // apply incoming predictions
         lock (lockObj)
         {
             while (incomingResponses.Count > 0)
@@ -72,14 +79,13 @@ public class PositionSender : MonoBehaviour
                 try
                 {
                     Prediction p = JsonUtility.FromJson<Prediction>(line);
-                    Debug.LogFormat("[PositionSender] Prediction received: yaw={0}, pitch={1}, roll={2}, shoot={3}",
+                    Debug.LogFormat("[PositionSender] Prediction: yaw={0}, pitch={1}, roll={2}, shoot={3}",
                         p.yaw_delta, p.pitch_delta, p.roll_delta, p.shoot);
-                    // Call SetPrediction on main thread (we are already on main thread here)
                     botController.SetPrediction(p.yaw_delta, p.pitch_delta, p.roll_delta, p.shoot);
                 }
                 catch (Exception e)
                 {
-                    Debug.LogWarning("[PositionSender] parse fail: " + e.Message + " raw:" + line);
+                    Debug.LogWarning("[PositionSender] Parse fail: " + e.Message + " raw:" + line);
                 }
             }
         }
@@ -91,48 +97,49 @@ public class PositionSender : MonoBehaviour
         try { stream?.Close(); client?.Close(); } catch { }
     }
 
+    float[] GetVel(Transform t)
+    {
+        var rb = t.GetComponent<Rigidbody>();
+        if (rb != null)
+            return new float[] { rb.linearVelocity.x, rb.linearVelocity.y, rb.linearVelocity.z };
+        return new float[] { 0f, 0f, 0f };
+    }
+
     private void NetLoop()
     {
         while (running)
         {
             try
             {
-                client = new TcpClient();
-                client.NoDelay = true;
-                client.Connect(serverIP, serverPort);
-                stream = client.GetStream();
-                stream.ReadTimeout = 2000;
-                Debug.Log("[PositionSender] Connected to server " + serverIP + ":" + serverPort);
-                break;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[PositionSender] Connection failed: " + e.Message);
-                Thread.Sleep(1000);
-            }
-        }
+                if (client == null || !client.Connected)
+                {
+                    Debug.Log("[PositionSender] Connecting to " + serverIP + ":" + serverPort);
+                    client = new TcpClient();
+                    client.NoDelay = true;
+                    client.Connect(serverIP, serverPort);
+                    stream = client.GetStream();
+                    stream.ReadTimeout = 2000;
+                    Debug.Log("[PositionSender] Connected.");
+                }
 
-        while (running)
-        {
-            try
-            {
+                // send state
                 string toSend = null;
                 lock (lockObj) { toSend = pendingStateJson; pendingStateJson = null; }
-                if (!string.IsNullOrEmpty(toSend) && stream != null)
+                if (!string.IsNullOrEmpty(toSend))
                 {
                     byte[] data = Encoding.UTF8.GetBytes(toSend);
                     stream.Write(data, 0, data.Length);
                     stream.Flush();
                 }
 
-                // read server replies
-                while (client != null && client.Available > 0)
+                // receive responses
+                while (client.Available > 0)
                 {
                     byte[] buf = new byte[8192];
                     int read = stream.Read(buf, 0, buf.Length);
-                    if (read <= 0) break;
-                    string s = Encoding.UTF8.GetString(buf, 0, read);
-                    recvBuffer += s;
+                    if (read <= 0) throw new Exception("Server closed connection");
+                    recvBuffer += Encoding.UTF8.GetString(buf, 0, read);
+
                     while (recvBuffer.Contains("\n"))
                     {
                         int idx = recvBuffer.IndexOf("\n");
@@ -144,40 +151,16 @@ public class PositionSender : MonoBehaviour
                         }
                     }
                 }
+
+                Thread.Sleep((int)(sendInterval * 1000));
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[PositionSender] NetLoop exception: " + e.Message);
-                Reconnect();
+                Debug.LogWarning("[PositionSender] Connection lost: " + e.Message);
+                try { stream?.Close(); client?.Close(); } catch { }
+                Thread.Sleep(1000); // wait before reconnect
             }
-            Thread.Sleep(1);
         }
-    }
-
-    private void Reconnect()
-    {
-        try { stream?.Close(); client?.Close(); } catch { }
-        Thread.Sleep(500);
-        while (running)
-        {
-            try
-            {
-                client = new TcpClient { NoDelay = true };
-                client.Connect(serverIP, serverPort);
-                stream = client.GetStream();
-                stream.ReadTimeout = 2000;
-                Debug.Log("[PositionSender] Reconnected");
-                break;
-            }
-            catch { Thread.Sleep(1000); }
-        }
-    }
-
-    private float[] TryGetVelocity(Transform t)
-    {
-        var rb = t.GetComponent<Rigidbody>();
-        if (rb != null) return new float[] { rb.linearVelocity.x, rb.linearVelocity.y, rb.linearVelocity.z };
-        return new float[] { 0f, 0f, 0f };
     }
 
     [Serializable]
