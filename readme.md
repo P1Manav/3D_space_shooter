@@ -1,71 +1,117 @@
-# 3D Space Shooter with Reinforcement Learning
+---
 
-**(Still in development)**
+# 3D Space Shooter with Reinforcement Learning (DQN Phase Complete 🚀)
 
-## Demo
-- **[LINK](https://drive.google.com/file/d/1whLc1UUauiVTQG8RQjD-ApG4_6w7B1Hw/view)**
-## Overview
-This is a 3D space shooter game built in **Unity** with AI-controlled bots using **Reinforcement Learning (RL)**. The game features **endless waves of AI enemies** that track and attack the player. The AI bots use a custom reinforcement learning framework with **Deep Q-Learning (DQN)** for discrete actions and **Proximal Policy Optimization (PPO)** for continuous actions.
+## Status
 
-The game has two difficulty modes:
-1. **DQN Mode:** AI bots use Deep Q-Learning for decision-making.
-2. **PPO Mode:** AI bots use Proximal Policy Optimization for more advanced control.
-
-## Features
-- **Player vs. AI Combat:** The player must survive against intelligent AI-controlled spaceships.
-- **Reinforcement Learning Bots:** AI enemies detect the player's position, move toward them, and fire bullets.
-- **Multiple AI Algorithms:** The game allows switching between **DQN** and **PPO** for bot behavior.
-- **Single-Player & Multiplayer Modes:** Supports endless single-player waves and potential multiplayer expansion.
-- **Custom RL Server:** AI agents communicate with a Python-based RL server for training and decision-making.
-
-## Installation & Setup
-
-### 1. Clone the Repository
-```sh
-git clone https://github.com/your-repo/space-shooter-rl.git
-cd space-shooter-rl
-```
-
-### 2. Train the AI Models
-Train the reinforcement learning models before running the game:
-```sh
-python train_dqn.py
-python train_ppo.py
-```
-
-### 3. Start the RL Server
-Run the reinforcement learning server to enable AI decision-making:
-```sh
-python rl_server.py
-```
-
-### 4. Run the Game
-- Open the game in Unity and hit **Play** to test AI behaviors.
-- Train new models if needed.
-
-## Reinforcement Learning Details
-### AI Actions
-The AI spaceship can perform the following actions:
-- **Move Left / Right**
-- **Move Forward / Shift + Forward**
-- **Move Backward**
-- **Fire Bullet**
-
-### AI Training
-- **DQN (Deep Q-Learning):** Used for discrete actions like movement and firing.
-- **PPO (Proximal Policy Optimization):** Used for continuous control and smoother movements.
-- The AI ships **observe the player’s position** and decide actions to eliminate the player efficiently.
-
-## Future Improvements
-- Enhancing AI strategy with better reward shaping.
-- Multiplayer AI interactions.
-- Improved environment for better training efficiency.
-
-## Credits
-- **Game Engine:** Unity
-- **Programming Languages:** C# (Unity), Python (RL Server & Training)
-- **RL Framework:** Custom implementation using PyTorch/TensorFlow
+✅ **Deep Q-Network (DQN) AI implemented, integrated, and running in Unity**
+⚙️ **Next:** PPO implementation + comparative analysis between DQN and PPO
 
 ---
-Enjoy the game and happy coding! 🚀
 
+## Overview
+
+This is a **3D space shooter** game built in **Unity**, featuring AI-controlled spaceships that learn to fight the player in real-time using **Reinforcement Learning**.
+The AI logic runs in a separate Python server, and Unity communicates with it via TCP.
+
+We are implementing two RL approaches:
+
+1. **Deep Q-Network (DQN)** – *Completed in this phase*
+2. **Proximal Policy Optimization (PPO)** – *Planned for next phase*
+
+---
+
+## Development Timeline
+
+### **Phase 1 – Initial RL Server Experiments**
+
+* Started with **`rl_server.py`** — a generic RL server handling both **DQN** and **PPO** models.
+* Used a **very basic state space** (just positions) and simple discrete actions.
+* Limited control: bot movements felt unnatural and shooting was random.
+
+### **Phase 2 – Custom Server for Unity Integration**
+
+* Built **`server.py`** as a more Unity-friendly RL interface.
+* Added **player/bot state exchange** for real-time action prediction.
+* Early tests showed working movement but lacked smart aiming/shooting.
+
+### **Phase 3 – Dedicated Deep Q-Network Server**
+
+* Developed **`dqn_server.py`** — fully dedicated to DQN.
+* Major improvements:
+
+  * **Rich state representation** (position, velocity, rotation of both player & bot).
+  * **Discrete action space** with combinations of yaw/pitch/roll + shooting bit.
+  * **Reward shaping**:
+
+    * Positive for facing player.
+    * Bonus for being close + aiming.
+    * Large reward for hitting player.
+    * Penalty for being hit.
+  * **Experience replay** with continuous online training.
+  * **Model persistence**: saves checkpoints & always loads latest to continue learning.
+  * **Target network** for stable Q-learning.
+
+---
+
+## Current Architecture
+
+### **Unity Side**
+
+* **`BotController.cs`** – Receives yaw/pitch/roll deltas and shoot flag from Python server, applies rotation, fires bullets if conditions are met.
+* **`PlayerController.cs`** – Handles manual controls & shooting.
+* **`Bullet.cs`** – Bullet physics + collision + TCP hit reporting to RL server.
+* **`PositionSender.cs`** – Sends state updates to server every frame.
+
+### **Python Side (`dqn_server.py`)**
+
+* **State Encoding:** Combines normalized positions, velocities, and rotations.
+* **Action Encoding:** Maps discrete index → yaw/pitch/roll changes + shoot.
+* **Training Loop:** Runs in real-time while Unity plays.
+* **Persistence:** Saves the latest model regularly and checkpoints every 2000 steps.
+
+---
+
+## Challenges Overcome
+
+1. **TCP Sync & Latency**
+
+   * Had to batch state messages and carefully parse `\n`-terminated JSON to avoid freezes.
+2. **Bullet Handling in Unity**
+
+   * Early issues with bullets spawning but not moving; fixed prefab instantiation & Rigidbody velocity application.
+3. **RL Reward Design**
+
+   * Initial DQN failed to learn — fixed by shaping rewards for *alignment*, *distance*, and *combat events*.
+4. **Model Forgetting**
+
+   * Prevented loss of progress by **always loading latest model** and training incrementally during gameplay.
+5. **Bot Aiming**
+
+   * Added a **view-cone check** so the bot only shoots when the player is in front.
+
+---
+
+## How to Run (DQN Mode)
+
+1. **Start the DQN Server**
+
+```bash
+python dqn_server.py
+```
+
+2. **Run the Unity Project**
+
+   * Set **BotController** to connect to `127.0.0.1:5000`.
+   * Press **Play** in Unity.
+   * The bot will train live as the game runs.
+
+---
+
+## Next Steps
+
+* Implement **PPO-based bot** for smoother control.
+* Record gameplay data to compare **learning curves** between DQN and PPO.
+* Analyze **reaction time, accuracy, and win rate** for both methods.
+
+---
