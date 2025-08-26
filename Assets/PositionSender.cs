@@ -10,7 +10,7 @@ public class PositionSender : MonoBehaviour
     public Transform player;
     public Transform botTransform;
     public BotController botController;
-    public string agentId = "bot_1";
+    public string agentId = "";
     public string serverIP = "127.0.0.1";
     public int serverPort = 5000;
     public float sendInterval = 0.05f; // ~20 FPS update
@@ -25,18 +25,10 @@ public class PositionSender : MonoBehaviour
     private Queue<string> incomingResponses = new Queue<string>();
     private string recvBuffer = "";
 
-    private static bool alreadyExists = false; // singleton protection
+    
 
     void Start()
     {
-        if (alreadyExists)
-        {
-            Debug.LogError("[PositionSender] Duplicate instance detected. Destroying...");
-            Destroy(gameObject);
-            return;
-        }
-        alreadyExists = true;
-
         if (player == null || botTransform == null || botController == null)
         {
             Debug.LogError("[PositionSender] Assign player, botTransform and botController in Inspector!");

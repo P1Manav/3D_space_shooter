@@ -5,7 +5,7 @@ public class BotController : MonoBehaviour
 {
     public Transform firePoint;
     public GameObject bulletPrefab; // prefab from Project window
-    public string agentId = "bot_1";
+    public string agentId = "";
     public string ownerTag = "Bot";
     public float moveSpeed = 12f;
     public float rotationMultiplier = 1f;
@@ -75,6 +75,7 @@ public class BotController : MonoBehaviour
 
         Rigidbody rb = bullet.GetComponent<Rigidbody>();
         if (rb != null) rb.linearVelocity = firePoint.forward * bulletSpeed;
+
 
         Collider bulletCol = bullet.GetComponent<Collider>();
         if (bulletCol != null && myCollider != null) Physics.IgnoreCollision(bulletCol, myCollider);

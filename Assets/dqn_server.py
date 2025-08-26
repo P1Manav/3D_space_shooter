@@ -72,7 +72,8 @@ memory_lock = threading.Lock()
 model_lock = threading.Lock()
 train_steps = 0
 agents = {}  # agent_id -> {'prev_state', 'prev_action_idx', 'prev_dist'}
-
+connected_bots = set()
+conn_lock = threading.Lock()
 # ---------------- helpers ----------------
 def encode_action(idx):
     shoot_idx = idx // NUM_ROT
@@ -210,6 +211,10 @@ def handle_client(conn, addr):
 
                 # STATE message
                 agent_id = msg.get("agent_id", "bot_1")
+                with conn_lock:
+                    if agent_id not in connected_bots:
+                        connected_bots.add(agent_id)
+                        print(f"[NET] Bot {agent_id} connected. Total bots: {len(connected_bots)}")
                 required = ("player_pos","player_vel","player_rot","bot_pos","bot_vel","bot_rot")
                 if not all(k in msg for k in required):
                     print("[NET] State message missing keys:", msg.keys()); continue
@@ -264,17 +269,33 @@ def handle_client(conn, addr):
                     EPSILON = max(EPSILON_MIN, EPSILON * EPSILON_DECAY)
 
                 # respond
-                resp = {"yaw_delta": yaw_delta, "pitch_delta": pitch_delta, "roll_delta": roll_delta, "shoot": shoot_bool}
+                resp = {
+                    "yaw_delta": yaw_delta,
+                    "pitch_delta": pitch_delta,
+                    "roll_delta": roll_delta,
+                    "shoot": shoot_bool
+                }
                 try:
                     conn.sendall((json.dumps(resp) + "\n").encode("utf-8"))
+                    print(f"[DQN] Prediction for {agent_id} -> yaw:{yaw_delta:.2f}, pitch:{pitch_delta:.2f}, roll:{roll_delta:.2f}, shoot:{shoot_bool}")
                 except Exception as e:
-                    print("[NET] send failed", e)
+                    print(f"[NET] send failed to {agent_id}", e)
+
     except Exception as e:
         print("[NET] client handler exception:", e)
     finally:
         try: conn.close()
         except: pass
-        print("[NET] Disconnected", addr)
+        with conn_lock:
+            for aid in list(connected_bots):
+                if aid in agents:
+                    # if this bot hasn't updated in >5s, drop it
+                    # (you could refine this with timestamps if needed)
+                    pass
+            if len(connected_bots) > 0:
+                print(f"[NET] Disconnected {addr}. Active bots: {len(connected_bots)}")
+            else:
+                print("[NET] No active bots.")
 
 # ---------------- server ----------------
 def start_server():

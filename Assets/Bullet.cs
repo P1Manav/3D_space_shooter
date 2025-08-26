@@ -3,6 +3,7 @@ using UnityEngine;
 using System;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 [RequireComponent(typeof(Rigidbody), typeof(Collider))]
 public class Bullet : MonoBehaviour
@@ -74,30 +75,34 @@ public class Bullet : MonoBehaviour
 
     private void SendHitReport(string shooter, string victimAgent, string victimTag)
     {
-        try
+        ThreadPool.QueueUserWorkItem(_ =>
         {
-            var payload = new HitMsg()
+            try
             {
-                hit = true,
-                shooter_id = shooter,
-                victim_agent = victimAgent,
-                victim_tag = victimTag
-            };
-            string json = JsonUtility.ToJson(payload) + "\n";
-            using (TcpClient client = new TcpClient())
-            {
-                client.Connect(serverIP, serverPort);
-                NetworkStream st = client.GetStream();
-                byte[] data = Encoding.UTF8.GetBytes(json);
-                st.Write(data, 0, data.Length);
-                st.Flush();
-                st.Close();
+                var payload = new HitMsg()
+                {
+                    hit = true,
+                    shooter_id = shooter,
+                    victim_agent = victimAgent,
+                    victim_tag = victimTag
+                };
+                string json = JsonUtility.ToJson(payload) + "\n";
+
+                using (TcpClient client = new TcpClient())
+                {
+                    client.Connect(serverIP, serverPort);
+                    using (NetworkStream st = client.GetStream())
+                    {
+                        byte[] data = Encoding.UTF8.GetBytes(json);
+                        st.Write(data, 0, data.Length);
+                    }
+                }
             }
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning("[Bullet] Failed to send hit report: " + e.Message);
-        }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[Bullet] Failed to send hit report: " + e.Message);
+            }
+        });
     }
 
     [Serializable]
