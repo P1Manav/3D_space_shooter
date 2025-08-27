@@ -9,10 +9,10 @@ public class BotController : MonoBehaviour
     public string ownerTag = "Bot";
     public float moveSpeed = 12f;
     public float rotationMultiplier = 1f;
-    public float fov = 25f;
+    public float fov = 40f;
     public float bulletSpeed = 50f;
     public float fireRate = 0.2f; // seconds between shots
-    public float shootDistance = 120f; // only shoot if closer than this
+    public float shootDistance = 150f; // only shoot if closer than this
 
     private float yawDelta, pitchDelta, rollDelta;
     private bool shootRequested;
@@ -57,7 +57,7 @@ public class BotController : MonoBehaviour
                     nextFireTime = Time.time + fireRate;
                 }
             }
-            shootRequested = false;
+            //shootRequested = false;
         }
     }
 
@@ -74,7 +74,7 @@ public class BotController : MonoBehaviour
         }
 
         Rigidbody rb = bullet.GetComponent<Rigidbody>();
-        if (rb != null) rb.linearVelocity = firePoint.forward * bulletSpeed;
+        if (rb != null) rb.linearVelocity= firePoint.forward * bulletSpeed;
 
 
         Collider bulletCol = bullet.GetComponent<Collider>();
